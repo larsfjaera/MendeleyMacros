@@ -30,6 +30,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     Dim blnStyleForTitleOfBibliographyFound As Boolean
     Dim strURL As String
     Dim arrNonDetectedURLs, varNonDetectedURL As Variant
+    Dim iSplit As Integer
 
 
 '*****************************
@@ -144,7 +145,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
             'checks if the section has text with style indicated by strStyleForTitleOfBibliography
             '(it is a section not belonging to any chapter after the sections of parts and chapters)
             blnFound = False
-            With documentSection.Range.Find
+            With documentSection.range.Find
                 .Style = strStyleForTitleOfBibliography
                 .Execute
                 blnFound = .Found
@@ -158,7 +159,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
         'checks if the bibliography is in this section
         If blnFound Then
             'checks all fields
-            For Each sectionField In documentSection.Range.Fields
+            For Each sectionField In documentSection.range.Fields
                 'if it is the bibliography
                 If sectionField.Type = wdFieldAddin And Trim(sectionField.Code) = "ADDIN Mendeley Bibliography CSL_BIBLIOGRAPHY" Then
                     blnBibliographyFound = True
@@ -213,8 +214,8 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                             If blnReferenceEntryFound Then
                                 'creates the bookmark
                                 Selection.Bookmarks.Add _
-                                    Name:="SignetBibliographie_" & Format(CStr(intRefereceNumber), "00#"), _
-                                    Range:=Selection.Range
+                                    Name:="Reference_" & Format(CStr(intRefereceNumber), "00#"), _
+                                    range:=Selection.range
                             End If
 
                             'continues with the next number
@@ -249,7 +250,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                     If blnURLFound Then
                                         'checks there is no hyperlink already
                                         If Selection.Hyperlinks.Count = 0 Then
-                                            Selection.Hyperlinks.Add Anchor:=Selection.Range, _
+                                            Selection.Hyperlinks.Add Anchor:=Selection.range, _
                                                 Address:=Replace(Trim(CStr(varNonDetectedURL)), " ", "%20"), SubAddress:="", _
                                                 ScreenTip:=""
                                         End If
@@ -278,7 +279,8 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
                                 'selects the current field (Mendeley's bibliography field)
                                 sectionField.Select
-
+                                
+                                
                                 'finds all instances of current URL
                                 Do
                                     'finds and selects the text of the URL
@@ -289,7 +291,14 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                         .Execute
                                         blnURLFound = .Found
                                     End With
-
+                                    
+                                    
+                                        
+                                    'Debug.Print Selection
+                                    'Replace Expression:=Selection, Find:="https://doi.org/", Replace:="DOI: "
+                                    'Selection.Delete Unit:=wdCharacter, Count:=16
+                                    Selection.MoveStart Unit:=wdCharacter, Count:=16
+                                    Debug.Print Selection
                                     'creates the hyperlink
                                     If blnURLFound Then
                                         'checks there is no hyperlink already
@@ -298,20 +307,49 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                         '     when the hyperlink was created with the list of non detected URLs
                                         '     when a partial URL is detected and the hyperlink was created with the list of non detected URLs
                                         If Selection.Hyperlinks.Count = 0 Then
-                                            Selection.Hyperlinks.Add Anchor:=Selection.Range, _
+                                            Selection.Hyperlinks.Add Anchor:=Selection.range, _
                                                 Address:=strURL, SubAddress:="", _
                                                 ScreenTip:=""
+                                            Debug.Print Selection.range
                                         End If
                                     End If
+                                    
+                                    With Selection.Find
+                                        .Forward = True
+                                        .Wrap = wdFindStop
+                                        .Text = strURL
+                                        .Execute
+                                        blnURLFound = .Found
+                                    End With
 
                                 Loop Until (Not blnURLFound) 'finds all instances of current URL
-
+                                
+                                
                             Next 'treats all matches (all URLs in biblio) to generate hyperlinks
                         End If 'checks that the string can be compared
 
                     End If 'hyperlinks for URLs in bibliography
-
+                
+                    sectionField.Select
+                    Selection.Find.ClearFormatting
+                    Selection.Find.Replacement.ClearFormatting
+                    With Selection.Find
+                        .Text = "https://doi.org/"
+                        .Replacement.Text = "DOI: "
+                        .Forward = True
+                        .Wrap = wdFindContinue
+                        .Format = False
+                        .MatchCase = False
+                        .MatchWholeWord = False
+                        .MatchWildcards = False
+                        .MatchSoundsLike = False
+                        .MatchAllWordForms = False
+                    End With
+                    Selection.Find.Execute Replace:=wdReplaceAll
+                    
+                    
                 End If 'if it is the biblio
+                
             Next 'sectionField
         End If
     Next 'documentSection
@@ -368,7 +406,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     'checks all sections
     For Each documentSection In ActiveDocument.Sections
         'checks all fields
-        For Each sectionField In documentSection.Range.Fields
+        For Each sectionField In documentSection.range.Fields
             'if it is a citation
             If sectionField.Type = wdFieldAddin And Left(sectionField.Code, 18) = "ADDIN CSL_CITATION" Then
 
@@ -538,7 +576,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                 .Execute
                                 blnCitationEntryFound = .Found
                             End With
-
+                            
                             'if a match was found (it should always find it, but good practice)
                             'selects the correct entry text from the citation field
                             If blnCitationEntryFound Then
@@ -552,7 +590,10 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                     'uses the whole range
                                     Selection.MoveStart Unit:=wdCharacter, Count:=objMatchCitation.FirstIndex
                                 End If
-
+                                iSplit = InStrRev(objMatchCitation, ",")
+                                Selection.MoveStart Unit:=wdCharacter, Count:=iSplit
+                                
+                                
                                 'creates the hyperlink for the current citation entry
                                 'a cross-reference is not a good idea, it changes the text in citation (or may delete citation):
                                 'Selection.Fields.Add Range:=Selection.Range, _
@@ -560,8 +601,19 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                 '    Text:="REF " & Chr(34) & "SignetBibliographie_" & Format(CStr(i), "00#") & Chr(34) & " \h", _
                                 '    PreserveFormatting:=True
                                 'better to use normal hyperlink:
-                                Selection.Hyperlinks.Add Anchor:=Selection.Range, _
-                                    Address:="", SubAddress:="SignetBibliographie_" & Format(CStr(i), "00#"), _
+                                'Debug.Print Right(objMatchCitation.Value, 1)
+                                'If Right(objMatchCitation.Value, 1) = " " Then
+                                'Debug.Print Selection
+                                'End If
+                                'Selection.MoveStart Unit:=wdCharacter, Count:=objMatchCitation.FirstIndex - 4
+                                'iSplit = InStrRev(Selection, ",")
+                                'Debug.Print objMatchCitation.FirstIndex
+                                'Debug.Print Selection
+                                'Selection = Left(Selection, iSplit + 1)
+                                'Debug.Print objMatchCitation
+                                'Debug.Print Right(Selection, iSplit + 1)
+                                Selection.Hyperlinks.Add Anchor:=Selection.range, _
+                                    Address:="", SubAddress:="Reference_" & Format(CStr(i), "00#"), _
                                     ScreenTip:=""
 
                             End If
@@ -750,7 +802,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
             'checks if the section has text with style indicated by strStyleForTitleOfBibliography
             '(it is a section not belonging to any chapter after the sections of parts and chapters)
             blnFound = False
-            With documentSection.Range.Find
+            With documentSection.range.Find
                 .Style = strStyleForTitleOfBibliography
                 .Execute
                 blnFound = .Found
@@ -764,7 +816,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
         'checks if the bibliography is in this section
         If blnFound Then
             'checks all fields
-            For Each sectionField In documentSection.Range.Fields
+            For Each sectionField In documentSection.range.Fields
                 'if it is the bibliography
                 If sectionField.Type = wdFieldAddin And Trim(sectionField.Code) = "ADDIN Mendeley Bibliography CSL_BIBLIOGRAPHY" Then
                     blnBibliographyFound = True
@@ -800,7 +852,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
                             'creates the bookmark
                             Selection.Bookmarks.Add _
                                 Name:="SignetBibliographie_" & Format(CStr(intRefereceNumber), "00#"), _
-                                Range:=Selection.Range
+                                range:=Selection.range
                         End If
 
                         'continues with the next number
@@ -833,7 +885,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
                                     If blnURLFound Then
                                         'checks there is no hyperlink already
                                         If Selection.Hyperlinks.Count = 0 Then
-                                            Selection.Hyperlinks.Add Anchor:=Selection.Range, _
+                                            Selection.Hyperlinks.Add Anchor:=Selection.range, _
                                                 Address:=Replace(Trim(CStr(varNonDetectedURL)), " ", "%20"), SubAddress:="", _
                                                 ScreenTip:=""
                                         End If
@@ -882,7 +934,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
                                         '     when the hyperlink was created with the list of non detected URLs
                                         '     when a partial URL is detected and the hyperlink was created with the list of non detected URLs
                                         If Selection.Hyperlinks.Count = 0 Then
-                                            Selection.Hyperlinks.Add Anchor:=Selection.Range, _
+                                            Selection.Hyperlinks.Add Anchor:=Selection.range, _
                                                 Address:=strURL, SubAddress:="", _
                                                 ScreenTip:=""
                                         End If
@@ -934,7 +986,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
     'checks all sections
     For Each documentSection In ActiveDocument.Sections
         'checks all fields
-        For Each sectionField In documentSection.Range.Fields
+        For Each sectionField In documentSection.range.Fields
             'if it is a citation
             If sectionField.Type = wdFieldAddin And Left(sectionField.Code, 18) = "ADDIN CSL_CITATION" Then
 
@@ -987,7 +1039,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
                             '    Text:="REF " & Chr(34) & "SignetBibliographie_" & Format(CStr(intCitationNumber), "00#") & Chr(34) & " \h", _
                             '    PreserveFormatting:=True
                             'better to use normal hyperlink:
-                            Selection.Hyperlinks.Add Anchor:=Selection.Range, _
+                            Selection.Hyperlinks.Add Anchor:=Selection.range, _
                                 Address:="", SubAddress:="SignetBibliographie_" & Format(CStr(intCitationNumber), "00#"), _
                                 ScreenTip:=""
                         Else
@@ -1139,7 +1191,7 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
 '*****************************
     'checks all sections
     For Each documentSection In ActiveDocument.Sections
-        For Each sectionField In documentSection.Range.Fields
+        For Each sectionField In documentSection.range.Fields
             'if it is a citation
             If sectionField.Type = wdFieldAddin And Left(sectionField.Code, 18) = "ADDIN CSL_CITATION" Then
                 sectionField.Select
@@ -1153,7 +1205,7 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
                         'deletes all hyperlinks
                         For i = selectionHyperlinks.Count To 1 Step -1
                             'this method produces errors if the hyperlinks include the square brackets in IEEE
-                            If Left(selectionHyperlinks(1).Range.Text, 1) = "[" Then
+                            If Left(selectionHyperlinks(1).range.Text, 1) = "[" Then
                                 MsgBox "There was an error removing the hyperlinks" & vbCrLf & _
                                 "because they include the square brackets and" & vbCrLf & _
                                 "Microsoft Word does not like them this way." & vbCrLf & vbCrLf & _
@@ -1209,7 +1261,7 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
             'checks if the section has text with style indicated by strStyleForTitleOfBibliography
             '(it is a section not belonging to any chapter after the sections of parts and chapters)
             blnFound = False
-            With documentSection.Range.Find
+            With documentSection.range.Find
                 .Style = strStyleForTitleOfBibliography
                 .Execute
                 blnFound = .Found
@@ -1222,7 +1274,7 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
 
         'checks if the bibliography is in this section
         If blnFound Then
-            For Each sectionField In documentSection.Range.Fields
+            For Each sectionField In documentSection.range.Fields
                 'if it is the bibliography
                 If sectionField.Type = wdFieldAddin And Trim(sectionField.Code) = "ADDIN Mendeley Bibliography CSL_BIBLIOGRAPHY" Then
                     blnBibliographyFound = True
@@ -1435,7 +1487,7 @@ Function refreshDocument(Optional openingDocument As Boolean = False) As Boolean
     
     Dim markName As String
     
-    Dim thisField As field
+    Dim thisField As Field
 
     Dim mark
 
@@ -1445,7 +1497,7 @@ Function refreshDocument(Optional openingDocument As Boolean = False) As Boolean
     For Each mark In marks
         If citationNumber Mod 25 = 0 Then
             Call showStatusBarMessage("Mendeley is preparing to format your citations... (" & _
-                Round(100 * citationNumber / marks.count) & "%)")
+                Round(100 * citationNumber / marks.Count) & "%)")
         End If
 
         Set thisField = mark
@@ -1454,7 +1506,7 @@ Function refreshDocument(Optional openingDocument As Boolean = False) As Boolean
         
         If startsWith(markName, "ref Mendeley") Then
             markName = Right(markName, Len(markName) - 4)
-            thisField.code.Text = markName
+            thisField.Code.Text = markName
         End If
         
         If isMendeleyCitationField(markName) Then
@@ -1492,7 +1544,7 @@ Function refreshDocument(Optional openingDocument As Boolean = False) As Boolean
         Dim errorCitationIndex As Long
         errorCitationIndex = mendeleyApiClient().lastErrorCitationIndex()
         If errorCitationIndex <> -1 Then
-            Dim errorField As field
+            Dim errorField As Field
             Dim citationIndex As Long
             citationIndex = mendeleyApiClient().lastErrorCitationIndex() + 1
             Set errorField = marks(citationIndex)
@@ -1518,7 +1570,7 @@ Function refreshDocument(Optional openingDocument As Boolean = False) As Boolean
         
         If citationNumber Mod 15 = 0 Then
             Call showStatusBarMessage("Mendeley is updating your citations... (" & _
-                Round(100 * citationNumber / marks.count) & "%)")
+                Round(100 * citationNumber / marks.Count) & "%)")
         End If
 
         Set thisField = mark
@@ -1579,15 +1631,15 @@ Function refreshDocument(Optional openingDocument As Boolean = False) As Boolean
             End If
             
             Dim range As range
-            Set range = thisField.result
+            Set range = thisField.Result
             
             ' Get font used at start of bibliography
             range.Collapse (wdCollapseStart)
             
             Dim currentFontName As String
             Dim currentSize As Long
-            currentFontName = range.Font.name
-            currentSize = range.Font.size
+            currentFontName = range.Font.Name
+            currentSize = range.Font.Size
 
             ' Get paragraph used at start of bibliography
             Dim currentParagraphStyle As String 'MabEntwickeltSich
@@ -1595,13 +1647,13 @@ Function refreshDocument(Optional openingDocument As Boolean = False) As Boolean
             Dim currentParagraphSpaceAfter As Long
             Dim currentLineSpacingRule As Variant
 
-            currentParagraphStyle = range.style 'MabEntwickeltSich
+            currentParagraphStyle = range.Style 'MabEntwickeltSich
             currentParagraphSpaceBefore = range.ParagraphFormat.SpaceBefore
             currentParagraphSpaceAfter = range.ParagraphFormat.SpaceAfter
             currentLineSpacingRule = range.ParagraphFormat.LineSpacingRule
 
             ' Insert updated bibliography
-            Set range = thisField.result
+            Set range = thisField.Result
             ' Word 2013 dirty hack: We can not insert on the whole selection, we need to keep
             ' one character at the end of the selection
             If isWordRangeHackRequired Then
@@ -1610,7 +1662,7 @@ Function refreshDocument(Optional openingDocument As Boolean = False) As Boolean
             range.InsertFile (bibliography)
             ' Word 2013 dirty hack: Remove the last character
             If isWordRangeHackRequired Then
-                Set range = thisField.result
+                Set range = thisField.Result
                 range.Start = range.End - 1
                 range.Text = ""
             End If
@@ -1618,19 +1670,19 @@ Function refreshDocument(Optional openingDocument As Boolean = False) As Boolean
             ' Disable spell and grammar checking on the bibliography.
             ' This is done when the field is created in fnAddMark(), but the InsertFile() call
             ' resets this property of the Field result's range (at least on Mac Word 2011).
-            Set range = thisField.result
+            Set range = thisField.Result
             range.LanguageID = wdNoProofing
             
             ' Apply font to whole range
-            range.Font.name = currentFontName
-            range.Font.size = currentSize
+            range.Font.Name = currentFontName
+            range.Font.Size = currentSize
 
             ' Apply paragraph to whole range
             range.ParagraphFormat.SpaceBefore = currentParagraphSpaceBefore
             range.ParagraphFormat.SpaceAfter = currentParagraphSpaceAfter
             range.ParagraphFormat.LineSpacingRule = currentLineSpacingRule
 
-            range.style = currentParagraphStyle 'MabEntwickeltSich
+            range.Style = currentParagraphStyle 'MabEntwickeltSich
             
             ' Delete first character (is part of the first new paragraph of the RTF file)
             range.End = range.Start + 1
@@ -1692,3 +1744,4 @@ ExitFunction:
 
     Call showStatusBarMessage("")
 End Function
+
